@@ -7,8 +7,12 @@
 #include <stdint.h>
 
 #include <QFileDialog>
+#include <QMessageBox>
 
-/* Initial Permutation Table */
+/*
+ * Initial Permutation Table
+ * IP变换表
+ */
 static char IP_table[] = {
         58, 50, 42, 34, 26, 18, 10,  2,
         60, 52, 44, 36, 28, 20, 12,  4,
@@ -20,7 +24,10 @@ static char IP_table[] = {
         63, 55, 47, 39, 31, 23, 15,  7
 };
 
-/*Expansion table */
+/*
+ * Expansion table
+ * E变换表
+ */
 static char E_table[] = {
         32,  1,  2,  3,  4,  5,
         4,  5,  6,  7,  8,  9,
@@ -32,7 +39,10 @@ static char E_table[] = {
         28, 29, 30, 31, 32,  1
 };
 
-/* Permuted Choice 1 Table */
+/*
+ * Permuted Choice 1 Table
+ * 用于Key变换的PC1表
+ */
 static char PC1[] = {
         57, 49, 41, 33, 25, 17,  9,
         1, 58, 50, 42, 34, 26, 18,
@@ -45,7 +55,10 @@ static char PC1[] = {
         21, 13,  5, 28, 20, 12,  4
 };
 
-/* Permuted Choice 2 Table */
+/*
+ * Permuted Choice 2 Table
+ * 用于Key变换的PC2表
+ */
 static char PC2[] = {
         14, 17, 11, 24,  1,  5,
         3, 28, 15,  6, 21, 10,
@@ -57,13 +70,19 @@ static char PC2[] = {
         46, 42, 50, 36, 29, 32
 };
 
-/* Iteration Shift Array */
+/*
+ * Iteration Shift Array
+ * 用于Key变换的位移表
+ */
 static char iteration_shift[] = {
         /* 1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16 */
         1,  1,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2,  1
 };
 
-/* The S-Box tables */
+/*
+ * The S-Box tables
+ * 用于F变换的S表
+ */
 static char S_table[8][64] = {
         {
                 14,  0,  4, 15, 13,  7,  1,  4,  2, 14, 15,  2, 11, 13,  8,  1,
@@ -108,7 +127,10 @@ static char S_table[8][64] = {
         }
 };
 
-/* Post S-Box permutation */
+/*
+ * Post S-Box permutation
+ * 用于F变换的P表
+ */
 static char P_table[] = {
         16,  7, 20, 21,
         29, 12, 28, 17,
@@ -120,7 +142,10 @@ static char P_table[] = {
         22, 11,  4, 25
 };
 
-/* Inverse of Initial Permutation Table */
+/*
+ * Inverse of Initial Permutation Table
+ * IP逆变换表
+ */
 int IP_inverse_table[] = {
         40,  8, 48, 16, 56, 24, 64, 32,
         39,  7, 47, 15, 55, 23, 63, 31,
@@ -132,13 +157,14 @@ int IP_inverse_table[] = {
         33,  1, 41,  9, 49, 17, 57, 25};
 
 /*
- * The DES function
- * input: 64 bit message
- * key: 64 bit key for encryption/decryption
- * mode: 'e' = encryption; 'd' = decryption
+ * The function of DES
+ * DES中需要用到的函数及变换
  */
 
-/* initial permutation */
+/*
+ * initial permutation
+ * 第一步IP变换
+ */
 void IP(uint64_t input, uint32_t* left, uint32_t* right) {
     *left = 0;
     *right = 0;
@@ -146,7 +172,6 @@ void IP(uint64_t input, uint32_t* left, uint32_t* right) {
     int i = 0;
     for (; i < 32; i++) {
         *left <<= 1;
-        // index = 57, 49, 41 ...
         int index = IP_table[i] - 1;
         *left += (input >> (63 - index)) & 0x1;
     }
@@ -156,13 +181,12 @@ void IP(uint64_t input, uint32_t* left, uint32_t* right) {
         int index = IP_table[i] - 1;
         *right += (input >> (63 - index)) & 0x1;
     }
-
-    //printf("%x\n", left);
-    //printf("%x\n", right);
-    //return right;
 }
 
-/* F(R,K) function */
+/*
+ * E function of F(R,K) function
+ * F函数中的第一步E变换
+ */
 uint64_t E(uint32_t R) {
     uint64_t s_input = 0;
     int i =0;
@@ -174,6 +198,10 @@ uint64_t E(uint32_t R) {
     return s_input;
 }
 
+/*
+ * K function
+ * 加密/解密数据时Key的变化
+ */
 uint64_t sub_key[16]        = {0};
 void K(char *kdest[16], uint64_t key){
     int i, j;
@@ -218,6 +246,24 @@ void K(char *kdest[16], uint64_t key){
     }
 }
 
+/*
+ * S function
+ * F函数中的中间一步S变换
+ */
+uint32_t S(uint64_t s_input) {
+    uint32_t s_output = 0;
+    for (int i = 0; i < 8; i++) {
+        s_output <<= 4;
+        uint8_t tmp = (uint8_t)S_table[i][(s_input >> ((7 - i) * 6)) & 0x3f];
+        s_output += tmp;
+    }
+    return s_output;
+}
+
+/*
+ * P function of F(R,K) function
+ * F函数中的最后一步P变换
+ */
 uint32_t P(uint32_t s_output) {
     uint32_t p_output = 0;
     int i = 0;
@@ -229,33 +275,36 @@ uint32_t P(uint32_t s_output) {
     return p_output;
 }
 
-uint32_t S(uint64_t s_input) {
-    uint32_t s_output = 0;
-    for (int i = 0; i < 8; i++) {
-        s_output <<= 4;
-        uint8_t tmp = (uint8_t)S_table[i][(s_input >> ((7 - i) * 6)) & 0x3f];
-        s_output += tmp;
-    }
-    return s_output;
-}
-
+/*
+ * F(R,K) function
+ * F函数，运用了以上变换
+ */
 uint32_t F(uint32_t R, uint64_t key) {
     uint64_t s_input;
     uint32_t s_output;
     uint32_t p_output;
+
     //XORing expanded Ri with Ki
     s_input = E(R) ^ key;
-
-
-    //printf("s_input: %x",(uint32_t)((s_input>>32)&0xffffffff));
-    //printf("%x\n",(uint32_t)(s_input&0xffffffff));
     s_output = S(s_input);
     p_output = P(s_output);
-    //printf("%x\n", p_output);
     return p_output;
 }
 
-/* inverse initial permutation */
+/*
+ * exchange function
+ * 每一步交换Left与Right
+ */
+void exchange(uint32_t* a, uint32_t* b) {
+    uint32_t tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+/*
+ * inverse initial permutation
+ * 最后一步IP逆变换
+ */
 uint64_t IP_inverse(uint32_t left, uint32_t right) {
     uint64_t final = 0;
     uint64_t tmp = (((uint64_t)left) << 32) + right;
@@ -269,16 +318,9 @@ uint64_t IP_inverse(uint32_t left, uint32_t right) {
     return final;
 }
 
-void exchange(uint32_t* a, uint32_t* b) {
-    uint32_t tmp = *a;
-    *a = *b;
-    *b = tmp;
-}
-
 /*
  * The DES function
- * input: 64 bit message
- * key: 64 bit key for encryption/decryption
+ * input: 64 bit message & 64 bit key
  * mode: 'e' = encryption; 'd' = decryption
  */
 void des(char *kdest[16], char *desdest[16], uint64_t in, uint64_t key, char mode){
@@ -321,14 +363,26 @@ void des(char *kdest[16], char *desdest[16], uint64_t in, uint64_t key, char mod
     printf("%x%x\n", (uint32_t)((output>>32)&0xffffffff), (uint32_t)(output&0xffffffff));
 }
 
+/*
+ * The function of DES_file
+ * DES文件加密/解密中需要用到的函数及变换
+ */
+
+/*
+ * The File_K founction
+ * 加密/解密文件时file_key的变化
+ */
 void File_K(uint64_t key){
+
     int i, j;
+
     /* 28 bits */
     uint32_t C = 0;
     uint32_t D = 0;
     /* 48 bits */
 
     uint64_t s_input            = 0;
+
     /* 56 bits */
     uint64_t permuted_choice_1  = 0;
     uint64_t permuted_choice_2  = 0;
@@ -363,7 +417,10 @@ void File_K(uint64_t key){
     }
 }
 
-
+/*
+ * The ntohl64 founction
+ * 在内存中将数据反过来
+ */
 uint64_t ntohl64(uint64_t host) {
     uint64_t ret = 0;
     uint32_t high,low;
@@ -379,8 +436,7 @@ uint64_t ntohl64(uint64_t host) {
 
 /*
  * The DES_file function
- * input: file
- * key: 64 bit key for encryption/decryption
+ * input: file & 64 bit key
  * mode: 'e' = encryption; 'd' = decryption
  */
 uint64_t des_file(uint64_t in, char mode) {
@@ -394,11 +450,11 @@ uint64_t des_file(uint64_t in, char mode) {
        */
         uint32_t right1;
         if (mode == 'e') {
-            // encryption_jiami
+            // encryption
             right1 = left ^ F(right, sub_key[i]);
 
         } else {
-            // decryption_jiemi
+            // decryption
             right1 = left ^ F(right, sub_key[15-i]);
 
         }
@@ -415,10 +471,22 @@ uint64_t des_file(uint64_t in, char mode) {
 
 }
 
+/*
+ * The QT View
+ * 可视化界面相关
+ */
+
+/*
+ * The MainWindow
+ * QT默认主界面
+ */
 MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::MainWindow)
+        QMainWindow(parent),
+        ui(new Ui::MainWindow)
 {
+    /*
+     * 主界面在三个文本框中呈现默认值
+     */
     ui->setupUi(this);
     ui->in_result->setText("abcdef1234567890");
     ui->key->setText("aaaaaaaaaaaaaaa");
@@ -430,11 +498,14 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-//encryption jiami
+/*
+ * encryption_button_clicked
+ * 加密数据按钮点击
+ */
 void MainWindow::on_encryption_clicked()
 {
     // to get the in_result
-    uint64_t in = 0xabcdef1234567890;//0xabcdef1234567890;
+    uint64_t in = 0xabcdef1234567890;
     QLineEdit *lineEdit = new QLineEdit;
     lineEdit->text();
     QString a=ui->in_result->text();
@@ -503,11 +574,14 @@ void MainWindow::on_encryption_clicked()
     delete [] result_str;
 }
 
-//decryption jiemi
+/*
+ * decryption_button_clicked
+ * 解密数据按钮点击
+ */
 void MainWindow::on_decryption_clicked()
 {
     // to get the out_result
-    uint64_t in = 0x47a8fc11244b6fa2;//0x47a8fc11244b6fa2
+    uint64_t in = 0x47a8fc11244b6fa2;
     QLineEdit *lineEdit = new QLineEdit;
     lineEdit->text();
     QString a=ui->out_result->text();
@@ -580,37 +654,59 @@ void MainWindow::on_decryption_clicked()
     delete [] result_str;
 }
 
+/*
+ * selectFileButton_clicked
+ * 选择文件按钮点击
+ */
 void MainWindow::on_selectFileButton_clicked()
 {
-    QString path = QFileDialog::getOpenFileName(this, "Open Filek");
-    std::cout << path.toStdString() << std::endl;
-    //ui->file_in->setText(path.toStdString());
+    QString file_path = QFileDialog::getOpenFileName(this, "Open Filek");
+    //std::cout << path.toStdString() << std::endl;
+    ui->file_in->setText(file_path);
 }
 
+/*
+ * selectPathButton_clicked
+ * 保存文件按钮点击
+ */
 void MainWindow::on_selectPathButton_clicked()
 {
-    QString path = QFileDialog::getExistingDirectory(this, "Open Filek");
-    std::cout << path.toStdString() << std::endl;
-    //QString file_full, file_name, file_path;
-    //QFileInfo fi;
-
-    //file_full = QFileDialog::getOpenFileName(this);
-    //QFileInfo fi = QFileInfo(file_full);
-    //QString file_path = fi.absolutePath();
-
-    //std::cout << ba.data();
-    //ui->file_in->setText(model.filePath(tree->currentIndex()));
+    QString result_path = QFileDialog::getSaveFileName(this, "Open Filek");
+    //std::cout << path.toStdString() << std::endl;
+    ui->file_out->setText(result_path);
 }
 
+
+/*
+ * file_encryption_button_clicked
+ * 加密文件按钮点击
+ */
 void MainWindow::on_file_encryption_clicked()
 {
-    char *file = "/Users/lisa/Desktop/b.pdf";
-    uint64_t file_key = 0xaaaaaaaaaaaaaaaa;
-    File_K(file_key);
-
+    QString file_path = ui->file_in->text();
+    QString result_path = ui->file_out->text();
+    const char *file = file_path.toStdString().c_str();
     FILE *file_in, *file_out;
     file_in = fopen(file, "rb");
-    file_out = fopen("/Users/lisa/Desktop/c", "wb");
+    file_out = fopen(result_path.toStdString().c_str(), "wb");
+
+    //get the key
+    uint64_t file_key = 0xaaaaaaaaaaaaaaaa;
+    QString a = ui->file_key->text();
+    for(int i=0;i<a.size();i++)
+    {
+        QChar qc=a.at(i);
+        if(qc.isDigit())
+        {
+            file_key=(file_key<<4)+qc.toLatin1()-48;
+        }
+        else if(qc.isLetter())
+        {
+            file_key =(file_key<<4)+qc.toLatin1()-87;
+        }
+    }
+
+    File_K(file_key);
 
     fseek(file_out, 24, SEEK_CUR);
 
@@ -619,20 +715,20 @@ void MainWindow::on_file_encryption_clicked()
     uint64_t content;
 
     while ((n = fread(&content, 1, 8, file_in)) > 0) {
-             if (n < 8) {
-                 // fill zeros
-                 len += n * 8;
-                 content = content << (64 - n * 8) >> (64 - n * 8);
-             } else {
-                 len += 64;
-             }
+        if (n < 8) {
+            // fill zeros
+            len += n * 8;
+            content = content << (64 - n * 8) >> (64 - n * 8);
+        } else {
+            len += 64;
+        }
 
-             // change the order
-              content = ntohl64(content);
-              content = des_file(content, 'e');
+        // change the order
+        content = ntohl64(content);
+        content = des_file(content, 'e');
 
-           uint64_t result = ntohl64(content);
-           fwrite(&result, sizeof(result), 1, file_out);
+        uint64_t result = ntohl64(content);
+        fwrite(&result, sizeof(result), 1, file_out);
     }
 
     len = des_file(len, 'e');
@@ -646,22 +742,48 @@ void MainWindow::on_file_encryption_clicked()
 
     fclose(file_in);
     fclose(file_out);
+    QMessageBox::information(this, "INFORMATION", "File Finished!");
 }
 
+/*
+ * file_decryption_button_clicked
+ * 解密文件按钮点击
+ */
 void MainWindow::on_file_decryption_clicked() {
-    char *file = "/Users/lisa/Desktop/c";
-    uint64_t file_key = 0xaaaaaaaaaaaaaaaa;
-    File_K(file_key);
-
+    QString file_path = ui->file_in->text();
+    QString result_path = ui->file_out->text();
+    const char *file = file_path.toStdString().c_str();
     FILE *file_in, *file_out;
     file_in = fopen(file, "rb");
-    file_out = fopen("/Users/lisa/Desktop/d", "wb");
+    file_out = fopen(result_path.toStdString().c_str(), "wb");
+
+    //get the key
+    uint64_t file_key = 0xaaaaaaaaaaaaaaaa;
+    QString a = ui->file_key->text();
+
+    for(int i=0;i<a.size();i++)
+    {
+        QChar qc=a.at(i);
+        if(qc.isDigit())
+        {
+            file_key=(file_key<<4)+qc.toLatin1()-48;
+        }
+        else if(qc.isLetter())
+        {
+            file_key =(file_key<<4)+qc.toLatin1()-87;
+        }
+    }
+
+    File_K(file_key);
+
+
 
     fseek(file_in, 0, SEEK_END);
     long file_size = ftell(file_in);
 
     fseek(file_in, 0, SEEK_SET);
 
+    //check the file
     uint64_t len1, len2, len3, len;
     fread(&len1, 1, 8, file_in);
     fread(&len2, 1, 8, file_in);
@@ -674,10 +796,11 @@ void MainWindow::on_file_decryption_clicked() {
     } else if (len2 == len3) {
         len = len2;
     } else {
-        printf("voting error");
+        QMessageBox::information(this, "INFORMATION", "Failure! the doc isn't OK !");
         return;
     }
 
+    //check the size of the file
     len = ntohl64(len);
     len = des_file(len, 'd');
 
@@ -685,7 +808,7 @@ void MainWindow::on_file_decryption_clicked() {
     uint64_t remain = 8 - len_ % 8;
 
     if (len_ + 24 + remain != file_size) {
-        printf("error2\n");
+        QMessageBox::information(this, "INFORMATION", "Failure! the doc isn't OK !");
         return;
     }
 
@@ -696,30 +819,28 @@ void MainWindow::on_file_decryption_clicked() {
     for (uint64_t i = 0; i < unit_len; i++) {
         fread(&content, 1, 8, file_in);
         content = ntohl64(content);
-
         content = des_file(content, 'd');
-
         content = ntohl64(content);
-
         fwrite(&content, 1, 8, file_out);
     }
 
     uint8_t content_decoded_8;
-        fread(&content, 1, 8, file_in);
+    fread(&content, 1, 8, file_in);
 
-        content = ntohl64(content);
+    content = ntohl64(content);
+    content = des_file(content, 'd');
 
-        content = des_file(content, 'd');
+    /**
+     * Following data are written by byte.
+     */
+    for (uint8_t i = 0; i < unit_len_extra; i++) {
+        content_decoded_8 = (uint8_t)((content >> ((7-i)*8)) & 0xff);
+        fwrite(&content_decoded_8, 1, 1, file_out);
+    }
 
-        /**
-         * The reason why I not use ntohl64 here is:
-         * Following data are written by byte.
-         */
-        for (uint8_t i = 0; i < unit_len_extra; i++) {
-            content_decoded_8 = (uint8_t)((content >> ((7-i)*8)) & 0xff);
-            fwrite(&content_decoded_8, 1, 1, file_out);
-        }
+    fclose(file_in);
+    fclose(file_out);
 
-        fclose(file_in);
-        fclose(file_out);
+    //attention: Success
+    QMessageBox::information(this, "INFORMATION", "File Finished!");
 }
